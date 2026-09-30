@@ -1,97 +1,91 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 🎵 AppMusic
 
-# Getting Started
+<p align="center">
+  <img src="https://img.shields.io/badge/React_Native-0.78+-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React Native" />
+  <img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Android-Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Android" />
+  <img src="https://img.shields.io/badge/Status-Ativo-success?style=for-the-badge" alt="Status" />
+</p>
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+> Aplicativo móvel para reprodução de músicas locais e motor embutido de extração e download de áudios em alta fidelidade diretamente do YouTube.
 
-## Step 1: Start Metro
+---
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## ✨ Recursos Principais
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- 📥 **Motor de Download Embutido:** Cole o link de qualquer vídeo do YouTube e baixe o áudio em MP3 diretamente para a sua prateleira offline, sem redirecionamentos e com acompanhamento do progresso em tempo real.
+- 🌐 **Navegador YouTube Integrado:** Navegue pelo YouTube diretamente no app com detecção automática de músicas, captura inteligente de faixas de áudio e opção de baixar para a prateleira ou direto para uma playlist.
+- 🎧 **Player Nativo Completo:** Reprodução em segundo plano com suporte a fila, modo aleatório (*shuffle*), repetição (*repeat one / repeat all*), mini-player dinâmico e visualização em tela cheia com capa do álbum.
+- ⏱️ **Duração Real Automática:** Extração precisa dos minutos e segundos de cada faixa baixada através da API nativa `MediaMetadataRetriever` do Android.
+- 📁 **Organização e Playlists:** Crie, edite e organize playlists personalizadas com persistência local rápida.
+- 🎨 **Interface Premium:** Design elegante em tema *dark mode*, micro-animações suaves e tipografia moderna.
 
-```sh
-# Using npm
-npm start
+---
 
-# OR using Yarn
-yarn start
+## 🛠️ Tecnologias
+
+- **Frontend:** [React Native](https://reactnative.dev/), [TypeScript](https://www.typescriptlang.org/)
+- **Estilização e Ícones:** Vanilla StyleSheet, [Lucide React Native](https://lucide.dev/)
+- **Camada Nativa Android:** Kotlin, `MediaPlayer`, `MediaMetadataRetriever`, `HttpURLConnection`
+- **Navegação Webview:** [React Native WebView](https://github.com/react-native-webview/react-native-webview)
+- **Armazenamento Local:** [@react-native-async-storage/async-storage](https://github.com/react-native-async-storage/async-storage)
+
+---
+
+## 📂 Estrutura do Projeto
+
+```text
+AppMusic/
+├── android/               # Código nativo Android e módulos Kotlin customizados
+│   └── app/src/main/java/com/appmusic/
+│       ├── AudioPlayerModule.kt       # Controle de reprodução nativa
+│       ├── AudioDownloaderModule.kt   # Motor de download e extração de duração
+│       └── AppMusicPackage.kt         # Registro dos módulos nativos no RN
+├── src/
+│   ├── components/        # MiniPlayer, FullScreenPlayer e componentes de UI
+│   ├── context/           # MusicContext (gerenciamento global de estado e downloads)
+│   ├── screens/           # MainShelf, Downloads, Playlists, YouTubeBrowser
+│   ├── services/          # audioEngine, storage e youtubeEngine
+│   ├── theme/             # Paleta de cores, tipografia e espaçamentos
+│   ├── types/             # Definições de tipos TypeScript
+│   └── utils/             # Formatadores de tempo e tamanho de arquivo
+└── App.tsx                # Ponto de entrada do aplicativo
 ```
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## 🚀 Como Executar
 
-### Android
+### Pré-requisitos
+- [Node.js](https://nodejs.org/) (versão 18 ou superior)
+- [Android Studio](https://developer.android.com/studio) com SDK configurado (variáveis `ANDROID_HOME` no PATH)
+- Dispositivo físico Android conectado via USB (com depuração USB ativada) ou Emulador ativo
 
-```sh
-# Using npm
-npm run android
+### Passo a Passo
 
-# OR using Yarn
-yarn android
-```
+1. **Clone o repositório:**
+   ```bash
+   git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
+   cd SEU_REPOSITORIO
+   ```
 
-### iOS
+2. **Instale as dependências:**
+   ```bash
+   npm install
+   ```
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+3. **Inicie o servidor Metro:**
+   ```bash
+   npm start
+   ```
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+4. **Compile e instale no dispositivo Android (em outro terminal):**
+   ```bash
+   npm run android
+   ```
 
-```sh
-bundle install
-```
+---
 
-Then, and every time you update your native dependencies, run:
+## 📄 Licença
 
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Este projeto é disponibilizado sob a licença [MIT](LICENSE).
