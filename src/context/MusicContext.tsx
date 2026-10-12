@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import { Song, Playlist, DownloadProgress, PlaybackState, RepeatMode } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { loadSongs, saveSongs, loadPlaylists, savePlaylists } from '../services/storage';
@@ -75,7 +75,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const queueRef = useRef<Song[]>([]);
   const repeatModeRef = useRef<RepeatMode>('off');
   const isShuffleRef = useRef<boolean>(false);
+  const isCompletingRef = useRef<boolean>(false);
   const handleSongCompletedRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const nextSongRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const previousSongRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   songsRef.current = songs;
   currentSongRef.current = currentSong;
@@ -88,7 +91,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     async function init() {
       const loadedSongs = await loadSongs();
       setSongs(loadedSongs);
+      songsRef.current = loadedSongs;
       setActiveQueue(loadedSongs);
+      queueRef.current = loadedSongs;
       const loadedPlaylists = await loadPlaylists();
       setPlaylists(loadedPlaylists);
 
@@ -127,7 +132,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const totalSec = Math.round(durMs / 1000);
           setDuration(totalSec);
 
-          if (currentSongRef.current.duration !== totalSec && totalSec > 0) {
+          if ((!currentSongRef.current.duration || currentSongRef.current.duration <= 0) && totalSec > 0) {
             currentSongRef.current = { ...currentSongRef.current, duration: totalSec };
             setCurrentSong((prev) => (prev ? { ...prev, duration: totalSec } : null));
             setSongs((prevSongs) => {
@@ -213,38 +218,56 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const handleSongCompleted = async () => {
+    if (isCompletingRef.current) return;
+    isCompletingRef.current = true;
+    setTimeout(() => {
+      isCompletingRef.current = false;
+    }, 1000);
+
     const mode = repeatModeRef.current;
     if (mode === 'one' && currentSongRef.current) {
       await audioEngine.seekTo(0);
       await audioEngine.play(currentSongRef.current.url, currentSongRef.current.id);
       return;
     }
-    await nextSong();
+    await nextSongRef.current();
   };
   handleSongCompletedRef.current = handleSongCompleted;
 
   const playSong = async (song: Song, queue?: Song[]) => {
     try {
-      setCurrentSong(song);
+      // Synchronously update currentSongRef & queueRef to ensure instant consistency
+      currentSongRef.current = song;
       if (queue && queue.length > 0) {
+        queueRef.current = queue;
         setActiveQueue(queue);
-      } else if (!activeQueue.some((s) => s.id === song.id)) {
+      } else if (!queueRef.current.some((s) => s.id === song.id)) {
+        queueRef.current = songsRef.current;
         setActiveQueue(songsRef.current);
       }
+
+      setCurrentSong(song);
       setPosition(0);
       setDuration(song.duration || 0);
       setPlaybackState('BUFFERING');
       await audioEngine.play(song.url, song.id);
     } catch (e: any) {
-      Alert.alert('Erro ao Reproduzir', e?.message || 'Não foi possível tocar esta faixa.');
+      console.warn('Erro ao reproduzir musica:', e);
       setPlaybackState('STOPPED');
+      // If error occurs during playback, attempt to advance to the next song in sequence
+      setTimeout(() => {
+        if (queueRef.current.length > 1) {
+          nextSongRef.current();
+        }
+      }, 1000);
     }
   };
 
   const togglePlayPause = async () => {
     if (!currentSong) {
-      if (songs.length > 0) {
-        await playSong(songs[0]);
+      const q = queueRef.current.length > 0 ? queueRef.current : songs;
+      if (q.length > 0) {
+        await playSong(q[0], q);
       }
       return;
     }
@@ -267,17 +290,33 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const queue = queueRef.current.length > 0 ? queueRef.current : songsRef.current;
     if (queue.length === 0) return;
 
-    if (isShuffleRef.current) {
-      const randomIndex = Math.floor(Math.random() * queue.length);
-      await playSong(queue[randomIndex]);
+    if (isShuffleRef.current && queue.length > 1) {
+      const curId = currentSongRef.current?.id;
+      let nextIndex = Math.floor(Math.random() * queue.length);
+      if (queue[nextIndex].id === curId) {
+        nextIndex = (nextIndex + 1) % queue.length;
+      }
+      await playSong(queue[nextIndex], queue);
       return;
     }
 
     const currentIndex = queue.findIndex((s) => s.id === currentSongRef.current?.id);
-    if (currentIndex >= 0 && currentIndex < queue.length - 1) {
-      await playSong(queue[currentIndex + 1]);
-    } else if (repeatModeRef.current === 'all' && queue.length > 0) {
-      await playSong(queue[0]);
+    let nextIndex = 0;
+    if (currentIndex >= 0) {
+      if (currentIndex < queue.length - 1) {
+        // Avance para a música abaixo na lista
+        nextIndex = currentIndex + 1;
+      } else {
+        // Chegou ao fim da lista: reinicia no topo mantendo a sequência contínua
+        nextIndex = 0;
+      }
+    } else {
+      nextIndex = 0;
+    }
+
+    const targetSong = queue[nextIndex];
+    if (targetSong) {
+      await playSong(targetSong, queue);
     }
   };
 
@@ -292,12 +331,24 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (queue.length === 0) return;
 
     const currentIndex = queue.findIndex((s) => s.id === currentSongRef.current?.id);
+    let prevIndex = 0;
     if (currentIndex > 0) {
-      await playSong(queue[currentIndex - 1]);
+      prevIndex = currentIndex - 1;
+    } else if (currentIndex === 0) {
+      prevIndex = queue.length - 1;
+    } else {
+      prevIndex = 0;
+    }
+
+    const targetSong = queue[prevIndex];
+    if (targetSong) {
+      await playSong(targetSong, queue);
     } else {
       await seekTo(0);
     }
   };
+  nextSongRef.current = nextSong;
+  previousSongRef.current = previousSong;
 
   const toggleShuffle = () => {
     setIsShuffle((prev) => !prev);
@@ -312,22 +363,52 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleFavorite = async (songId: string) => {
-    const updatedSongs = songs.map((s) => (s.id === songId ? { ...s, isFavorite: !s.isFavorite } : s));
+    let nextIsFavorite = false;
+    const updatedSongs = songs.map((s) => {
+      if (s.id === songId) {
+        nextIsFavorite = !s.isFavorite;
+        return { ...s, isFavorite: nextIsFavorite };
+      }
+      return s;
+    });
     setSongs(updatedSongs);
     await saveSongs(updatedSongs);
 
+    // Update current song in state if active
+    if (currentSongRef.current && currentSongRef.current.id === songId) {
+      setCurrentSong((prev) => (prev ? { ...prev, isFavorite: nextIsFavorite } : null));
+    }
+
     // Also update system favorite playlist
     setPlaylists((prevPlaylists) => {
-      const updated = prevPlaylists.map((pl) => {
-        if (pl.id === 'pl_favs') {
+      let foundFavPl = false;
+      let updated = prevPlaylists.map((pl) => {
+        if (pl.id === 'pl_favs' || pl.name.toLowerCase().includes('favorita')) {
+          foundFavPl = true;
           const has = pl.songIds.includes(songId);
           return {
             ...pl,
-            songIds: has ? pl.songIds.filter((id) => id !== songId) : [...pl.songIds, songId],
+            songIds: nextIsFavorite
+              ? (has ? pl.songIds : [...pl.songIds, songId])
+              : pl.songIds.filter((id) => id !== songId),
           };
         }
         return pl;
       });
+
+      if (!foundFavPl && nextIsFavorite) {
+        const newFavPl: Playlist = {
+          id: 'pl_favs',
+          name: 'Favoritas ❤️',
+          description: 'Suas músicas curtidas e favoritas',
+          coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
+          songIds: [songId],
+          createdAt: Date.now(),
+          isSystem: true,
+        };
+        updated = [newFavPl, ...updated];
+      }
+
       savePlaylists(updated);
       return updated;
     });
@@ -616,40 +697,60 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const openPlayerModal = useCallback(() => setIsPlayerModalVisible(true), []);
+  const closePlayerModal = useCallback(() => setIsPlayerModalVisible(false), []);
+
+  const contextValue = useMemo<MusicContextType>(
+    () => ({
+      songs,
+      playlists,
+      currentSong,
+      playbackState,
+      isPlaying: playbackState === 'PLAYING',
+      position,
+      duration,
+      isShuffle,
+      repeatMode,
+      activeDownloads,
+      isPlayerModalVisible,
+      activeQueue,
+      playSong,
+      togglePlayPause,
+      seekTo,
+      nextSong,
+      previousSong,
+      toggleShuffle,
+      toggleRepeat,
+      toggleFavorite,
+      deleteSong,
+      createPlaylist,
+      deletePlaylist,
+      addSongToPlaylist,
+      removeSongFromPlaylist,
+      startDownload,
+      cancelDownload,
+      openPlayerModal,
+      closePlayerModal,
+    }),
+    [
+      songs,
+      playlists,
+      currentSong,
+      playbackState,
+      position,
+      duration,
+      isShuffle,
+      repeatMode,
+      activeDownloads,
+      isPlayerModalVisible,
+      activeQueue,
+      openPlayerModal,
+      closePlayerModal,
+    ]
+  );
+
   return (
-    <MusicContext.Provider
-      value={{
-        songs,
-        playlists,
-        currentSong,
-        playbackState,
-        isPlaying: playbackState === 'PLAYING',
-        position,
-        duration,
-        isShuffle,
-        repeatMode,
-        activeDownloads,
-        isPlayerModalVisible,
-        activeQueue,
-        playSong,
-        togglePlayPause,
-        seekTo,
-        nextSong,
-        previousSong,
-        toggleShuffle,
-        toggleRepeat,
-        toggleFavorite,
-        deleteSong,
-        createPlaylist,
-        deletePlaylist,
-        addSongToPlaylist,
-        removeSongFromPlaylist,
-        startDownload,
-        cancelDownload,
-        openPlayerModal: () => setIsPlayerModalVisible(true),
-        closePlayerModal: () => setIsPlayerModalVisible(false),
-      }}
-    >
+    <MusicContext.Provider value={contextValue}>
       {children}
     </MusicContext.Provider>
   );

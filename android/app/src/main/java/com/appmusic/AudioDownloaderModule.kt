@@ -21,11 +21,13 @@ class AudioDownloaderModule(private val reactContext: ReactApplicationContext) :
     override fun getName(): String = "AudioDownloaderModule"
 
     private fun sendEvent(eventName: String, params: WritableMap?) {
-        if (reactContext.hasActiveReactInstance()) {
-            reactContext
-                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                .emit(eventName, params)
-        }
+        try {
+            if (reactContext.hasActiveReactInstance()) {
+                reactContext
+                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    .emit(eventName, params)
+            }
+        } catch (_: Throwable) {}
     }
 
     @ReactMethod

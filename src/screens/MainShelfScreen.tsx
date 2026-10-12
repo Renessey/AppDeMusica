@@ -14,8 +14,6 @@ import {
 import {
   Search,
   X,
-  Globe,
-  DownloadCloud,
   Play,
   Pause,
   Shuffle,
@@ -25,10 +23,15 @@ import {
   Trash2,
   Plus,
   Music2,
+  Settings,
   HardDrive,
+  Sun,
+  Moon,
+  Check,
+  Disc,
 } from 'lucide-react-native';
 import { useMusic } from '../context/MusicContext';
-import { theme } from '../theme';
+import { useTheme, AppTheme } from '../theme';
 import { Song, Playlist } from '../types';
 import { formatTime, formatBytes } from '../utils/formatters';
 
@@ -36,7 +39,7 @@ interface MainShelfScreenProps {
   onNavigateToTab: (tabIndex: number) => void;
 }
 
-export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTab }) => {
+export const MainShelfScreen: React.FC<MainShelfScreenProps> = React.memo(({ onNavigateToTab }) => {
   const {
     songs,
     playlists,
@@ -49,10 +52,14 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
     addSongToPlaylist,
   } = useMusic();
 
+  const { theme, isDark, themeMode, setThemeMode } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSongForOptions, setSelectedSongForOptions] = useState<Song | null>(null);
   const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
   const [isAddToPlaylistModalVisible, setIsAddToPlaylistModalVisible] = useState(false);
+  const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
 
   // Filter songs
   const filteredSongs = useMemo(() => {
@@ -117,49 +124,29 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            {/* Header / Brand */}
+            {/* Header / Brand & Settings Icon */}
             <View style={styles.header}>
-              <View>
-                <Text style={styles.logoText}>
-                  App<Text style={styles.logoHighlight}>Music</Text>
-                </Text>
-                <Text style={styles.subLogoText}>Sua Prateleira Musical Pessoal</Text>
+              <View style={styles.brandRow}>
+                <Image
+                  source={require('../assets/logo.png')}
+                  style={styles.headerLogo}
+                  resizeMode="contain"
+                />
+                <View>
+                  <Text style={styles.logoText}>
+                    Upper<Text style={styles.logoHighlight}>Music</Text>
+                  </Text>
+                  <Text style={styles.subLogoText}>Sua Prateleira Musical Pessoal</Text>
+                </View>
               </View>
-              <View style={styles.storageBadge}>
-                <View style={styles.storageBadgeIconRow}>
-                  <HardDrive size={12} color={theme.colors.accentCyan} />
-                  <Text style={styles.storageBadgeLabel}>Espaço</Text>
-                </View>
-                <Text style={styles.storageBadgeValue}>{formatBytes(totalStorage)}</Text>
-              </View>
-            </View>
 
-            {/* Quick Action Cards */}
-            <View style={styles.quickActionsContainer}>
+              {/* Settings Button (Replaced storage badge as requested) */}
               <TouchableOpacity
-                style={[styles.quickCard, styles.quickCardYouTube]}
-                onPress={() => onNavigateToTab(2)} // YouTube Browser
+                style={styles.settingsButton}
+                activeOpacity={0.8}
+                onPress={() => setIsSettingsModalVisible(true)}
               >
-                <View style={styles.quickCardIconBox}>
-                  <Globe size={22} color="#a5b4fc" />
-                </View>
-                <View style={styles.quickCardTextBox}>
-                  <Text style={styles.quickCardTitle}>Navegar no YouTube</Text>
-                  <Text style={styles.quickCardSub}>Pesquise e extraia áudios</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.quickCard, styles.quickCardDownload]}
-                onPress={() => onNavigateToTab(3)} // Downloads
-              >
-                <View style={styles.quickCardIconBox}>
-                  <DownloadCloud size={22} color="#6ee7b7" />
-                </View>
-                <View style={styles.quickCardTextBox}>
-                  <Text style={styles.quickCardTitle}>Baixar Música</Text>
-                  <Text style={styles.quickCardSub}>Cole links para download</Text>
-                </View>
+                <Settings size={22} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </View>
 
@@ -262,7 +249,10 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
                 )}
               </View>
 
-              <Image source={{ uri: item.thumbnail }} style={styles.songThumbnail} />
+              <Image
+                source={item.thumbnail ? { uri: item.thumbnail } : require('../assets/logo.png')}
+                style={styles.songThumbnail}
+              />
 
               <View style={styles.songDetails}>
                 <Text
@@ -277,12 +267,6 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
                   </Text>
                   <Text style={styles.songDot}>•</Text>
                   <Text style={styles.songDuration}>{formatTime(item.duration)}</Text>
-                  {item.isDownloaded && (
-                    <>
-                      <Text style={styles.songDot}>•</Text>
-                      <Text style={styles.offlineTag}>Offline</Text>
-                    </>
-                  )}
                 </View>
               </View>
 
@@ -299,7 +283,11 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Music2 size={44} color={theme.colors.textMuted} style={styles.emptyIcon} />
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.emptyLogo}
+              resizeMode="contain"
+            />
             <Text style={styles.emptyTitle}>Nenhuma música encontrada</Text>
             <Text style={styles.emptySub}>
               Use a aba "YouTube" ou "Baixar" para adicionar novas músicas à sua prateleira!
@@ -307,6 +295,115 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
           </View>
         }
       />
+
+      {/* Settings Modal (Shows storage consumption & Light/Dark Theme toggle) */}
+      <Modal
+        visible={isSettingsModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsSettingsModalVisible(false)}
+      >
+        <View style={styles.settingsModalBackdrop}>
+          <View style={styles.settingsModalContent}>
+            {/* Header */}
+            <View style={styles.settingsHeader}>
+              <View>
+                <Text style={styles.settingsTitle}>Configurações</Text>
+                <Text style={styles.settingsSubtitle}>UpperMusic • Preferências</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.settingsCloseBtn}
+                onPress={() => setIsSettingsModalVisible(false)}
+              >
+                <X size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Storage Consumption Section */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsSectionTitle}>Armazenamento do Dispositivo</Text>
+              <View style={styles.storageCard}>
+                <View style={styles.storageIconBox}>
+                  <HardDrive size={24} color={theme.colors.accentCyan} />
+                </View>
+                <View style={styles.storageDetails}>
+                  <Text style={styles.storageLabel}>Espaço Consumido pelas Músicas</Text>
+                  <Text style={styles.storageValue}>{formatBytes(totalStorage)}</Text>
+                  <Text style={styles.storageSubText}>
+                    {songs.length} {songs.length === 1 ? 'faixa salva' : 'faixas salvas'} na memória
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Appearance / Theme Mode Section */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsSectionTitle}>Aparência do Aplicativo</Text>
+              <View style={styles.themeToggleContainer}>
+                {/* Dark Option */}
+                <TouchableOpacity
+                  style={[
+                    styles.themeOptionBtn,
+                    themeMode === 'dark' && styles.themeOptionBtnActive,
+                  ]}
+                  onPress={() => setThemeMode('dark')}
+                  activeOpacity={0.8}
+                >
+                  <Moon
+                    size={20}
+                    color={themeMode === 'dark' ? '#fff' : theme.colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.themeOptionText,
+                      themeMode === 'dark' && styles.themeOptionTextActive,
+                    ]}
+                  >
+                    Tema Escuro
+                  </Text>
+                  {themeMode === 'dark' && <Check size={16} color="#fff" />}
+                </TouchableOpacity>
+
+                {/* Light Option */}
+                <TouchableOpacity
+                  style={[
+                    styles.themeOptionBtn,
+                    themeMode === 'light' && styles.themeOptionBtnActive,
+                  ]}
+                  onPress={() => setThemeMode('light')}
+                  activeOpacity={0.8}
+                >
+                  <Sun
+                    size={20}
+                    color={themeMode === 'light' ? '#fff' : theme.colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.themeOptionText,
+                      themeMode === 'light' && styles.themeOptionTextActive,
+                    ]}
+                  >
+                    Tema Claro
+                  </Text>
+                  {themeMode === 'light' && <Check size={16} color="#fff" />}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* App Footer Info */}
+            <View style={styles.settingsFooter}>
+              <Image
+                source={require('../assets/logo.png')}
+                style={styles.settingsFooterLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.settingsFooterText}>
+                UpperMusic • Versão 1.0.0
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Options Modal */}
       <Modal
@@ -325,7 +422,11 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
               <>
                 <View style={styles.modalHeader}>
                   <Image
-                    source={{ uri: selectedSongForOptions.thumbnail }}
+                    source={
+                      selectedSongForOptions.thumbnail
+                        ? { uri: selectedSongForOptions.thumbnail }
+                        : require('../assets/logo.png')
+                    }
                     style={styles.modalSongThumb}
                   />
                   <View style={styles.modalSongInfo}>
@@ -422,403 +523,496 @@ export const MainShelfScreen: React.FC<MainShelfScreenProps> = ({ onNavigateToTa
       </Modal>
     </View>
   );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.bgDark,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 110,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoText: {
-    color: theme.colors.textPrimary,
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-  },
-  logoHighlight: {
-    color: theme.colors.accent,
-  },
-  subLogoText: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  storageBadge: {
-    backgroundColor: theme.colors.bgCard,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'flex-end',
-  },
-  storageBadgeIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  storageBadgeLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  storageBadgeValue: {
-    color: theme.colors.accentCyan,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 20,
-  },
-  quickCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  quickCardIconBox: {
-    marginRight: 10,
-  },
-  quickCardTextBox: {
-    flex: 1,
-  },
-  quickCardTitle: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  quickCardSub: {
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.bgCard,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    height: 46,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: 24,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-  },
-  carouselSection: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 14,
-  },
-  carouselScroll: {
-    gap: 14,
-  },
-  carouselCard: {
-    width: 170,
-    height: 180,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: theme.colors.bgCard,
-  },
-  carouselThumb: {
-    width: '100%',
-    height: '100%',
-  },
-  carouselOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
-  carouselInfo: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    right: 12,
-  },
-  carouselSongTitle: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  carouselSongArtist: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 11,
-  },
-  carouselPlayButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playIconOffset: {
-    marginLeft: 2,
-  },
-  shelfHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  shelfTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 19,
-    fontWeight: '800',
-  },
-  shelfSubtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  randomPlayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.bgCard,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  randomPlayText: {
-    color: theme.colors.accentLight,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  songRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: 6,
-  },
-  songRowActive: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.accent,
-  },
-  songIndexBox: {
-    width: 22,
-    alignItems: 'center',
-  },
-  songIndex: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  songIndexActive: {
-    color: theme.colors.accent,
-  },
-  songThumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: theme.colors.bgCard,
-    marginLeft: 8,
-  },
-  songDetails: {
-    flex: 1,
-    marginLeft: 14,
-  },
-  songTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  songTitleActive: {
-    color: theme.colors.accentLight,
-  },
-  songSubDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  songArtist: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    maxWidth: 120,
-  },
-  songDot: {
-    color: theme.colors.textMuted,
-    marginHorizontal: 5,
-    fontSize: 10,
-  },
-  songDuration: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-  },
-  offlineTag: {
-    color: theme.colors.success,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  moreButton: {
-    padding: 8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 50,
-  },
-  emptyIcon: {
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  emptySub: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: theme.colors.bgCard,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalSongThumb: {
-    width: 50,
-    height: 50,
-    borderRadius: theme.borderRadius.sm,
-  },
-  modalSongInfo: {
-    flex: 1,
-    marginLeft: 14,
-  },
-  modalSongTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  modalSongArtist: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  modalDivider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginBottom: 16,
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  modalOptionIcon: {
-    marginRight: 16,
-  },
-  modalOptionText: {
-    color: theme.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  playlistSelectModal: {
-    backgroundColor: theme.colors.bgCard,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    padding: 24,
-  },
-  playlistSelectTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 16,
-  },
-  playlistSelectItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  playlistSelectIcon: {
-    marginRight: 12,
-  },
-  playlistSelectName: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  playlistSelectCount: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  playlistSelectCancel: {
-    marginTop: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: theme.borderRadius.md,
-  },
-  playlistSelectCancelText: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  quickCardYouTube: {
-    backgroundColor: '#1e1b4b',
-  },
-  quickCardDownload: {
-    backgroundColor: '#064e3b',
-  },
-  playlistScroll: {
-    maxHeight: 300,
-  },
-  playlistItemInfo: {
-    flex: 1,
-  },
 });
+
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.bgDark,
+    },
+    listContent: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 110,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    brandRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    headerLogo: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+    },
+    logoText: {
+      color: theme.colors.textPrimary,
+      fontSize: 26,
+      fontWeight: '900',
+      letterSpacing: -0.5,
+    },
+    logoHighlight: {
+      color: theme.colors.accent,
+    },
+    subLogoText: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    settingsButton: {
+      width: 44,
+      height: 44,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.bgCard,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.bgCard,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      height: 46,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: 24,
+    },
+    searchIcon: {
+      marginRight: 10,
+    },
+    searchInput: {
+      flex: 1,
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+    },
+    carouselSection: {
+      marginBottom: 28,
+    },
+    sectionTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 17,
+      fontWeight: '800',
+      marginBottom: 14,
+    },
+    carouselScroll: {
+      gap: 14,
+    },
+    carouselCard: {
+      width: 170,
+      height: 180,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden',
+      position: 'relative',
+      backgroundColor: theme.colors.bgCard,
+    },
+    carouselThumb: {
+      width: '100%',
+      height: '100%',
+    },
+    carouselOverlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    carouselInfo: {
+      position: 'absolute',
+      bottom: 12,
+      left: 12,
+      right: 12,
+    },
+    carouselSongTitle: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '700',
+      marginBottom: 2,
+    },
+    carouselSongArtist: {
+      color: 'rgba(255, 255, 255, 0.75)',
+      fontSize: 11,
+    },
+    carouselPlayButton: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    playIconOffset: {
+      marginLeft: 2,
+    },
+    shelfHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    shelfTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 19,
+      fontWeight: '800',
+    },
+    shelfSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    randomPlayBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: theme.colors.bgCard,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: theme.borderRadius.full,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    randomPlayText: {
+      color: theme.colors.accentLight,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    songRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+      borderRadius: theme.borderRadius.md,
+      marginBottom: 6,
+    },
+    songRowActive: {
+      backgroundColor: theme.colors.activeRowBg,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.colors.accent,
+    },
+    songIndexBox: {
+      width: 22,
+      alignItems: 'center',
+    },
+    songIndex: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    songIndexActive: {
+      color: theme.colors.accent,
+    },
+    songThumbnail: {
+      width: 48,
+      height: 48,
+      borderRadius: theme.borderRadius.sm,
+      backgroundColor: theme.colors.bgCard,
+      marginLeft: 8,
+    },
+    songDetails: {
+      flex: 1,
+      marginLeft: 14,
+    },
+    songTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+      marginBottom: 3,
+    },
+    songTitleActive: {
+      color: theme.colors.accentLight,
+    },
+    songSubDetails: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    songArtist: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      maxWidth: 160,
+    },
+    songDot: {
+      color: theme.colors.textMuted,
+      marginHorizontal: 5,
+      fontSize: 10,
+    },
+    songDuration: {
+      color: theme.colors.textMuted,
+      fontSize: 11,
+    },
+    moreButton: {
+      padding: 8,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: 50,
+    },
+    emptyLogo: {
+      width: 76,
+      height: 76,
+      borderRadius: 18,
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: 6,
+    },
+    emptySub: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+      paddingHorizontal: 20,
+    },
+
+    // Settings Modal Styles
+    settingsModalBackdrop: {
+      flex: 1,
+      backgroundColor: theme.colors.modalOverlay,
+      justifyContent: 'flex-end',
+    },
+    settingsModalContent: {
+      backgroundColor: theme.colors.bgCard,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
+    },
+    settingsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    settingsTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 20,
+      fontWeight: '900',
+    },
+    settingsSubtitle: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    settingsCloseBtn: {
+      padding: 6,
+    },
+    settingsSection: {
+      marginBottom: 22,
+    },
+    settingsSectionTitle: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 10,
+    },
+    storageCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.cardItemBg,
+      padding: 16,
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    storageIconBox: {
+      width: 46,
+      height: 46,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: 'rgba(6, 182, 212, 0.12)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 14,
+    },
+    storageDetails: {
+      flex: 1,
+    },
+    storageLabel: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    storageValue: {
+      color: theme.colors.accentCyan,
+      fontSize: 18,
+      fontWeight: '900',
+      marginTop: 2,
+    },
+    storageSubText: {
+      color: theme.colors.textMuted,
+      fontSize: 11,
+      marginTop: 2,
+    },
+    themeToggleContainer: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    themeOptionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.cardItemBg,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 8,
+    },
+    themeOptionBtnActive: {
+      backgroundColor: theme.colors.accent,
+      borderColor: theme.colors.accent,
+    },
+    themeOptionText: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    themeOptionTextActive: {
+      color: '#fff',
+    },
+    settingsFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    settingsFooterLogo: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+    },
+    settingsFooterText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+
+    // Standard Options & Playlist Modals
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: theme.colors.modalOverlay,
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: theme.colors.bgCard,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    modalSongThumb: {
+      width: 50,
+      height: 50,
+      borderRadius: theme.borderRadius.sm,
+    },
+    modalSongInfo: {
+      flex: 1,
+      marginLeft: 14,
+    },
+    modalSongTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    modalSongArtist: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    modalDivider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      marginBottom: 16,
+    },
+    modalOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+    },
+    modalOptionIcon: {
+      marginRight: 16,
+    },
+    modalOptionText: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    playlistSelectModal: {
+      backgroundColor: theme.colors.bgCard,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      padding: 24,
+      maxHeight: '70%',
+    },
+    playlistSelectTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: 16,
+    },
+    playlistScroll: {
+      maxHeight: 280,
+    },
+    playlistSelectItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    playlistSelectIcon: {
+      marginRight: 12,
+    },
+    playlistItemInfo: {
+      flex: 1,
+    },
+    playlistSelectName: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    playlistSelectCount: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    playlistSelectCancel: {
+      alignItems: 'center',
+      paddingVertical: 14,
+      marginTop: 12,
+    },
+    playlistSelectCancelText: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  });

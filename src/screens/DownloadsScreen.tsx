@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import {
   FolderDown,
 } from 'lucide-react-native';
 import { useMusic } from '../context/MusicContext';
-import { theme } from '../theme';
+import { useTheme, AppTheme } from '../theme';
 import { extractVideoId, fetchYouTubeMetadata } from '../services/youtubeEngine';
 import { formatBytes, formatTime } from '../utils/formatters';
 
@@ -28,7 +28,7 @@ interface DownloadsScreenProps {
   onNavigateToYouTube?: (url: string) => void;
 }
 
-export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({ onNavigateToYouTube }) => {
+export const DownloadsScreen: React.FC<DownloadsScreenProps> = React.memo(({ onNavigateToYouTube }) => {
   const {
     startDownload,
     cancelDownload,
@@ -36,6 +36,9 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({ onNavigateToYo
     songs,
     playSong,
   } = useMusic();
+
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [inputUrl, setInputUrl] = useState('');
   const [customTitle, setCustomTitle] = useState('');
@@ -88,8 +91,15 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({ onNavigateToYo
       {/* Title */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Zap size={24} color={theme.colors.accent} fill={theme.colors.accent} />
-          <Text style={styles.title}>Motor de Download</Text>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
+          <View>
+            <Text style={styles.title}>Motor de Download</Text>
+            <Text style={styles.subBrand}>UpperMusic</Text>
+          </View>
         </View>
         <Text style={styles.subtitle}>
           Extraia e baixe áudios diretamente para sua prateleira sem intermediários.
@@ -237,7 +247,11 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({ onNavigateToYo
 
         {downloadedSongs.length === 0 ? (
           <View style={styles.emptyOffline}>
-            <FolderDown size={40} color={theme.colors.textMuted} style={styles.emptyOfflineIcon} />
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.emptyOfflineLogo}
+              resizeMode="contain"
+            />
             <Text style={styles.emptyOfflineText}>
               Nenhuma música baixada offline ainda. Use o campo acima ou o navegador YouTube!
             </Text>
@@ -250,7 +264,12 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({ onNavigateToYo
               activeOpacity={0.8}
               onPress={() => playSong(song, downloadedSongs)}
             >
-              <Image source={{ uri: song.thumbnail }} style={styles.offlineSongThumb} />
+              <Image
+                source={
+                  song.thumbnail ? { uri: song.thumbnail } : require('../assets/logo.png')
+                }
+                style={styles.offlineSongThumb}
+              />
               <View style={styles.offlineSongInfo}>
                 <Text style={styles.offlineSongTitle} numberOfLines={1}>
                   {song.title}
@@ -272,9 +291,10 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({ onNavigateToYo
       </View>
     </ScrollView>
   );
-};
+});
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.bgDark,
@@ -290,12 +310,22 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+  },
+  headerLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
   },
   title: {
     color: theme.colors.textPrimary,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '900',
+  },
+  subBrand: {
+    color: theme.colors.accentLight,
+    fontSize: 11,
+    fontWeight: '700',
   },
   subtitle: {
     color: theme.colors.textSecondary,
@@ -479,8 +509,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
   },
-  emptyOfflineIcon: {
-    marginBottom: 8,
+  emptyOfflineLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    marginBottom: 12,
   },
   emptyOfflineText: {
     color: theme.colors.textMuted,
@@ -529,4 +562,4 @@ const styles = StyleSheet.create({
   playIconOffset: {
     marginLeft: 2,
   },
-});
+  });

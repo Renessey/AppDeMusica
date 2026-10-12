@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,11 +22,11 @@ import {
   FolderHeart,
 } from 'lucide-react-native';
 import { useMusic } from '../context/MusicContext';
-import { theme } from '../theme';
+import { useTheme, AppTheme } from '../theme';
 import { Playlist, Song } from '../types';
 import { formatTime } from '../utils/formatters';
 
-export const PlaylistsScreen: React.FC = () => {
+export const PlaylistsScreen: React.FC = React.memo(() => {
   const {
     playlists,
     songs,
@@ -38,6 +38,9 @@ export const PlaylistsScreen: React.FC = () => {
     deletePlaylist,
     removeSongFromPlaylist,
   } = useMusic();
+
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
@@ -119,12 +122,13 @@ export const PlaylistsScreen: React.FC = () => {
               {/* Playlist Banner */}
               <View style={styles.detailHeader}>
                 <Image
-                  source={{
-                    uri:
-                      activePlaylist.coverUrl ||
-                      playlistSongs[0]?.thumbnail ||
-                      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
-                  }}
+                  source={
+                    activePlaylist.coverUrl
+                      ? { uri: activePlaylist.coverUrl }
+                      : playlistSongs[0]?.thumbnail
+                      ? { uri: playlistSongs[0]?.thumbnail }
+                      : require('../assets/logo.png')
+                  }
                   style={styles.detailCover}
                 />
                 <Text style={styles.detailTitle}>{activePlaylist.name}</Text>
@@ -184,7 +188,10 @@ export const PlaylistsScreen: React.FC = () => {
                       </Text>
                     )}
                   </View>
-                  <Image source={{ uri: item.thumbnail }} style={styles.songThumbnail} />
+                  <Image
+                    source={item.thumbnail ? { uri: item.thumbnail } : require('../assets/logo.png')}
+                    style={styles.songThumbnail}
+                  />
                   <View style={styles.songDetails}>
                     <Text
                       style={[styles.songTitle, isThisCurrent && styles.songTitleActive]}
@@ -209,7 +216,11 @@ export const PlaylistsScreen: React.FC = () => {
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <FolderHeart size={44} color={theme.colors.textMuted} style={styles.emptyIcon} />
+              <Image
+                source={require('../assets/logo.png')}
+                style={styles.emptyLogo}
+                resizeMode="contain"
+              />
               <Text style={styles.emptyTitle}>Esta playlist está vazia</Text>
               <Text style={styles.emptySub}>
                 Volte à prateleira principal e use o menu (⋮) nas músicas para adicioná-las aqui!
@@ -231,9 +242,16 @@ export const PlaylistsScreen: React.FC = () => {
         ListHeaderComponent={
           <View>
             <View style={styles.header}>
-              <View>
-                <Text style={styles.title}>Playlists</Text>
-                <Text style={styles.subtitle}>Suas coleções personalizadas</Text>
+              <View style={styles.headerBrandRow}>
+                <Image
+                  source={require('../assets/logo.png')}
+                  style={styles.headerLogo}
+                  resizeMode="contain"
+                />
+                <View>
+                  <Text style={styles.title}>Playlists</Text>
+                  <Text style={styles.subtitle}>Suas coleções personalizadas</Text>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -248,17 +266,16 @@ export const PlaylistsScreen: React.FC = () => {
         }
         renderItem={({ item }) => {
           const count = item.songIds.length;
-          const cover =
-            item.coverUrl ||
-            'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80';
-
           return (
             <TouchableOpacity
               style={styles.playlistCard}
               activeOpacity={0.85}
               onPress={() => setSelectedPlaylist(item)}
             >
-              <Image source={{ uri: cover }} style={styles.playlistCover} />
+              <Image
+                source={item.coverUrl ? { uri: item.coverUrl } : require('../assets/logo.png')}
+                style={styles.playlistCover}
+              />
               <View style={styles.playlistInfo}>
                 <Text style={styles.playlistName} numberOfLines={1}>
                   {item.name}
@@ -325,9 +342,10 @@ export const PlaylistsScreen: React.FC = () => {
       </Modal>
     </View>
   );
-};
+});
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.bgDark,
@@ -342,6 +360,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+  },
+  headerBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
   },
   title: {
     color: theme.colors.textPrimary,
@@ -573,8 +601,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
   },
-  emptyIcon: {
-    marginBottom: 12,
+  emptyLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   emptyTitle: {
     color: theme.colors.textPrimary,
@@ -663,4 +694,4 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-});
+  });

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { useMusic } from '../context/MusicContext';
-import { theme } from '../theme';
+import { useTheme, AppTheme } from '../theme';
 import { YOUTUBE_INJECTED_JS, extractVideoId, fetchYouTubeMetadata } from '../services/youtubeEngine';
 import { Playlist } from '../types';
 
@@ -46,8 +46,10 @@ interface YouTubeBrowserScreenProps {
   initialUrl?: string | null;
 }
 
-export const YouTubeBrowserScreen: React.FC<YouTubeBrowserScreenProps> = ({ initialUrl }) => {
+export const YouTubeBrowserScreen: React.FC<YouTubeBrowserScreenProps> = React.memo(({ initialUrl }) => {
   const { startDownload, playlists, createPlaylist } = useMusic();
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const webViewRef = useRef<WebView>(null);
 
   const [currentUrl, setCurrentUrl] = useState(initialUrl || 'https://m.youtube.com');
@@ -310,6 +312,11 @@ export const YouTubeBrowserScreen: React.FC<YouTubeBrowserScreenProps> = ({ init
       {/* Top Browser Bar */}
       <View style={styles.browserHeader}>
         <View style={styles.navControls}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
           <TouchableOpacity
             style={[styles.navBtn, !canGoBack && styles.navBtnDisabled]}
             disabled={!canGoBack}
@@ -388,6 +395,10 @@ export const YouTubeBrowserScreen: React.FC<YouTubeBrowserScreenProps> = ({ init
             setCanGoForward(navState.canGoForward);
             setIsLoading(navState.loading);
 
+            if (navState.url && navState.url.startsWith('http')) {
+              setCurrentUrl(navState.url);
+            }
+
             const id = extractVideoId(navState.url);
             if (id) {
               setDetectedVideo((prev) => {
@@ -414,7 +425,14 @@ export const YouTubeBrowserScreen: React.FC<YouTubeBrowserScreenProps> = ({ init
       {/* Floating Action Button / Dock when a video is open */}
       {detectedVideo && (
         <View style={styles.floatingActionDock}>
-          <Image source={{ uri: detectedVideo.thumbnail }} style={styles.dockThumb} />
+          <Image
+            source={
+              detectedVideo.thumbnail
+                ? { uri: detectedVideo.thumbnail }
+                : require('../assets/logo.png')
+            }
+            style={styles.dockThumb}
+          />
           <View style={styles.dockInfo}>
             <View style={styles.dockTagRow}>
               <Sparkles
@@ -593,9 +611,10 @@ export const YouTubeBrowserScreen: React.FC<YouTubeBrowserScreenProps> = ({ init
       </Modal>
     </View>
   );
-};
+});
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.bgDark,
@@ -612,6 +631,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    marginRight: 8,
   },
   navBtn: {
     width: 36,
@@ -966,4 +991,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-});
+  });
